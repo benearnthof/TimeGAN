@@ -55,7 +55,6 @@ utils.py
 ## Necessary Packages
 import numpy as np
 from sklearn.metrics import accuracy_score
-from utils import train_test_divide, extract_time, batch_generator
 
 
 
