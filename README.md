@@ -9,3 +9,17 @@ A recreation of the results of the original Time GAN paper is very hard to achie
 
 In general, we think we might be able to produce better results with careful selection of hyper parameters and more extensive training. As we struggled to reproduce the Time GAN results, we did not conduct the implementation of the ada FNN layer as we did not expect a positive result on the outcome. 
 Additionally, the AdaFNN code was already fully available in Pytorch, so there it would have made no sense to "translate" the code. In general it should be possible to swap out the Embedding network in TimeGAN for an AdaFNN layer. Working with functional data should greatly benefit from this added "compression" step and lead to better learning in the Generator. 
+
+## Repository Structure: 
+requirements.txt contains all dependencies and can be run with pip: 
+pip install -r requirements.txt 
+
+utils.py contains all helper functions, mostly from the original repository
+
+preprocess_eeg_data.R is used to preprocess the eeg data provided to us and make it usable for TimeGAN
+
+modules_and_training contains the main implementation of TimeGAN. The Network blocks are defined there, aswell as a function that runs training and returns the trained networks. 
+
+demo_multivariat.ipynb and demo_univariat.ipynb contain demos for the respective cases, aswell as analyses of their results
+
+best_demo_run.ipynb contains the best training run we obtained while experimenting with different hyperparameter settings. 
