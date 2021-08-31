@@ -26,7 +26,7 @@ class Time_GAN_module(nn.Module):
 
         #Defining the layers
         # RNN Layer
-        if self.rnn_type = "gru":
+        if self.rnn_type == "gru":
           self.rnn = nn.GRU(input_size, hidden_dim, n_layers, batch_first=True)
         elif self.rnn_type == "rnn":
           self.rnn = nn.RNN(input_size, hidden_dim, num_layers, batch_first = True) 
@@ -42,7 +42,7 @@ class Time_GAN_module(nn.Module):
             # Initializing hidden state for first input using method defined below
             if self.rnn_type in ["rnn", "gru"]:
               hidden = self.init_hidden(batch_size)
-            elif self.rnn_type == "lstm" # additional initial cell state for lstm
+            elif self.rnn_type == "lstm": # additional initial cell state for lstm
               h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(device).float()
               c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(device).float()
               hidden = (h0, c0)

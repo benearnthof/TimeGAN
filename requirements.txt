@@ -1,0 +1,4 @@
+torch==1.9.0+cu102
+numpy==1.19.5
+matplotlib==3.2.2
+scikit_learn==0.24.2
