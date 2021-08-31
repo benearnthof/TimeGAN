@@ -26,7 +26,7 @@ class Time_GAN_module(nn.Module):
 
         #Defining the layers
         # RNN Layer
-        if self.rnn_type = "gru":
+        if self.rnn_type == "gru":
           self.rnn = nn.GRU(input_size, hidden_dim, n_layers, batch_first=True)
         elif self.rnn_type == "rnn":
           self.rnn = nn.RNN(input_size, hidden_dim, num_layers, batch_first = True) 
