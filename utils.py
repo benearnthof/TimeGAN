@@ -171,3 +171,54 @@ def extract_time (data):
     time.append(len(data[i][:,0]))
     
   return time, max_seq_len
+
+def discriminative_score(num_batches, G, D, S, E, dataloader, batch_size, dim, seq_len, hidden_dim):
+  """
+  Function to calculate Discriminative score
+  args: 
+    - num_batches: How many batches of data should be evaluated? 
+    - G: Trained Generator
+    - D: Trained Discriminator
+    - S: Trained Supervisor
+    - E: Trained Embedder
+    - dataloader: the dataloader used for training
+    - batch_size: The batch size used for training
+    - dim: the number of features in the data
+    - seq_len: the length of each time series 
+    - hidden_dim: the hidden dimension of the modules
+
+  """
+  # optimally one should split the data into training, test, and validation set for this step
+  scores = []
+  for i in range(num_batches):
+    x = next(iter(dataloader))
+    random_data = random_generator(batch_size=batch_size, z_dim=dim, 
+                                 T_mb=extract_time(x)[0], max_seq_len=extract_time(x)[1])
+        
+    z = torch.tensor(random_data)
+    z = z.float()
+    # getting discriminator output for generated data    
+    e_hat, _ = G(z)
+    e_hat = torch.reshape(e_hat, (batch_size, seq_len, hidden_dim))
+        
+    H_hat, _ = Supervisor(e_hat)
+    H_hat = torch.reshape(H_hat, (batch_size, seq_len, hidden_dim))
+        
+    Y_pred_fake = D(H_hat)
+    # getting discriminator output for real data
+    embed, _ = E(x)
+    embed = torch.reshape(embed, (batch_size, seq_len, hidden_dim))
+
+    Y_pred_real = D(embed)
+    # calculate scores for batch
+    bce = nn.BCEWithLogitsLoss()
+    score_fake = bce(Y_pred_fake, torch.zeros_like(Y_pred_fake))
+    score_real = bce(Y_pred_real, torch.ones_like(Y_pred_real))
+    total = torch.add(score_real, score_fake)
+    avg = torch.abs(total/2)
+    avg = avg.detach().numpy()
+    # append to scores
+    scores.append(avg)
+  
+  # return average of scores for all batches
+  return np.mean(scores)
