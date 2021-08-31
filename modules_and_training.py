@@ -15,17 +15,23 @@ class Time_GAN_module(nn.Module):
     
     input_size = dim of data (depending if module operates on latent or non-latent space)
     """
-    def __init__(self, input_size, output_size, hidden_dim, n_layers, activation=torch.sigmoid):
+    def __init__(self, input_size, output_size, hidden_dim, n_layers, activation=torch.sigmoid, rnn_type="gru"):
         super(Time_GAN_module, self).__init__()
 
         # Parameters
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
         self.sigma = activation
+        self.rnn_type = rnn_type
 
         #Defining the layers
         # RNN Layer
-        self.rnn = nn.GRU(input_size, hidden_dim, n_layers, batch_first=True)   
+        if self.rnn_type = "gru":
+          self.rnn = nn.GRU(input_size, hidden_dim, n_layers, batch_first=True)
+        elif self.rnn_type == "rnn":
+          self.rnn = nn.RNN(input_size, hidden_dim, num_layers, batch_first = True) 
+        elif self.rnn_type == "lstm": # input params still the same for lstm
+          self.rnn = nn.LSTM(input_size, hidden_dim, num_layers, batch_first = True)
         # Fully connected layer
         self.fc = nn.Linear(hidden_dim, output_size)
         
@@ -34,8 +40,12 @@ class Time_GAN_module(nn.Module):
             batch_size = x.size(0)
 
             # Initializing hidden state for first input using method defined below
-            hidden = self.init_hidden(batch_size)
-
+            if self.rnn_type in ["rnn", "gru"]:
+              hidden = self.init_hidden(batch_size)
+            elif self.rnn_type == "lstm" # additional initial cell state for lstm
+              h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(device).float()
+              c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(device).float()
+              hidden = (h0, c0)
             # Passing in the input and hidden state into the model and obtaining outputs
             out, hidden = self.rnn(x, hidden)
         
@@ -60,6 +70,18 @@ class Time_GAN_module(nn.Module):
         return hidden
     
 def TimeGAN(data, parameters):
+  """
+  Main workhorse function of timegan
+  Args: 
+    - data = Time series data
+    - parameters = dictionary of training parameters
+  
+  hidden_dim = dimension of hidden layers, integer
+  num_layers = number of recurrent layers, integer
+  iterations = number of training iterations every epoch, integer  
+  batch_size = number of samples passed in every training batch, integer [32 - 128 works best]
+  epoch = number of training epochs
+  """
   hidden_dim = parameters["hidden_dim"]
   num_layers = parameters["num_layers"]
   iterations = parameters["iterations"]
@@ -72,19 +94,22 @@ def TimeGAN(data, parameters):
 
   checkpoints = {}
 
+  # instantiating every module we're going to train
   Embedder = Time_GAN_module(input_size=z_dim, output_size=hidden_dim, hidden_dim=hidden_dim, n_layers=num_layers)
   Recovery = Time_GAN_module(input_size=hidden_dim, output_size=dim, hidden_dim=hidden_dim, n_layers=num_layers)
   Generator = Time_GAN_module(input_size=dim, output_size=hidden_dim, hidden_dim=hidden_dim, n_layers=num_layers)
   Supervisor = Time_GAN_module(input_size=hidden_dim, output_size=hidden_dim, hidden_dim=hidden_dim, n_layers=num_layers)
   Discriminator = Time_GAN_module(input_size=hidden_dim, output_size=1, hidden_dim=hidden_dim, n_layers=num_layers, activation=nn.Identity)
 
+  # instantiating all optimizers, 
+  # learning rates chosen through experimentation and comparison with results in the paper
   embedder_optimizer = optim.Adam(Embedder.parameters(), lr=0.0035)
   recovery_optimizer = optim.Adam(Recovery.parameters(), lr=0.01)
   supervisor_optimizer = optim.Adam(Recovery.parameters(), lr=0.001)
   discriminator_optimizer = optim.Adam(Discriminator.parameters(), lr=0.01)
   generator_optimizer = optim.Adam(Generator.parameters(), lr=0.01)
   
-
+  # instantiating mse loss & Data Loader
   binary_cross_entropy_loss = nn.BCEWithLogitsLoss()
   MSE_loss = nn.MSELoss()
   loader = DataLoader(data, parameters['batch_size'], shuffle=False)
@@ -92,6 +117,7 @@ def TimeGAN(data, parameters):
                                        T_mb=extract_time(data)[0], max_seq_len=extract_time(data)[1])
   
   # Embedding Network Training
+  # Here we train embedding & Recovery network jointly
   print('Start Embedding Network Training')
   for e in range(epoch): 
     for batch_index, X in enumerate(loader):
@@ -102,6 +128,7 @@ def TimeGAN(data, parameters):
         X_tilde, _ = Recovery(H)
         X_tilde = torch.reshape(X_tilde, (batch_size, seq_len, dim))
 
+        # constants chosen like in the paper
         E_loss0 = 10 * torch.sqrt(MSE_loss(X, X_tilde))  
 
         Embedder.zero_grad()
@@ -118,6 +145,7 @@ def TimeGAN(data, parameters):
   print('Finish Embedding Network Training')
 
   # Training only with supervised loss
+  # here the embedder and supervisor are trained jointly
   print('Start Training with Supervised Loss Only')
   for e in range(epoch): 
     for batch_index, X in enumerate(loader):
@@ -143,11 +171,15 @@ def TimeGAN(data, parameters):
             print('step: '+ str(e) + '/' + str(epoch) + ', s_loss: ' + str(np.sqrt(G_loss_S.detach().numpy())))
 
   print('Finish Training with Supervised Loss Only')
-  # Joint Training
   
-
+  
+  # Joint Training
   print('Start Joint Training')
   for itt in range(epoch):
+    # the generator, supervisor and discriminator are trained for an extra two steps
+    # in the issues on github the author mentions, the marked constant of 0.15 (below)
+    # had been chosen because it worked well in experiments, and to keep the balance in
+    # training the generator and discriminator.
     for kk in range(2):
       X = next(iter(loader))
       random_data #= random_generator(batch_size=batch_size, z_dim=dim, 
@@ -285,6 +317,7 @@ def TimeGAN(data, parameters):
 
       # check discriminator loss before updating
       check_d_loss = D_loss
+      # This is the magic number 0.15 we mentioned above. Set exactly like in the original implementation
       if (check_d_loss > 0.15):
         D_loss.backward(retain_graph=True)
         discriminator_optimizer.step()        

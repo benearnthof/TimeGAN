@@ -3,6 +3,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
+# taken from the original paper https://github.com/jsyoon0823/TimeGAN/blob/master/utils.py
 def sine_data_generation (no, seq_len, dim):
   """Sine data generation.
   
@@ -40,6 +41,7 @@ def sine_data_generation (no, seq_len, dim):
                 
   return data
 
+# Data normalization
 def MinMaxScaler(data):
   """Min Max normalizer.
   
@@ -55,7 +57,7 @@ def MinMaxScaler(data):
   return norm_data
 
 def random_generator (batch_size, z_dim, T_mb, max_seq_len):
-  """Random vector generation.
+  """Random vector generation. (Generates a latent vector that is used in the Generator.)
   
   Args:
     - batch_size: size of the random vector
